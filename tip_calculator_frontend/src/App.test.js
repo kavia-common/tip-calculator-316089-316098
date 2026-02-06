@@ -245,34 +245,38 @@ describe('Tip Calculator App', () => {
     expect(getResultValueForLabel('Total / person (2)')).toHaveTextContent('$19.00');
   });
 
-  test('validation: people < 1 shows error state and clamps to 1 on blur', async () => {
+  test('validation: people < 1 clamps to 1 immediately on change (no interim invalid state)', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     const people = getPeopleInput();
 
-    // Set to 0 -> error state should show immediately (aria-invalid)
+    // Immediate clamping behavior: entering 0 becomes 1 immediately.
     fireEvent.change(people, { target: { value: '0' } });
-    expect(people).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText(/minimum is 1 person/i)).toBeInTheDocument();
+    expect(getPeopleInput()).toHaveValue(1);
+    expect(getPeopleInput()).toHaveAttribute('aria-invalid', 'false');
 
-    // Blur clamps to 1
+    // Blurring should keep it valid (still 1).
     await user.click(getBillInput()); // move focus away
     expect(getPeopleInput()).toHaveValue(1);
     expect(getPeopleInput()).toHaveAttribute('aria-invalid', 'false');
   });
 
-  test('validation: non-numeric people does not crash and clamps to 1 on blur', async () => {
+  test('validation: non-numeric people clamps to 1 immediately on change (no interim invalid state)', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     const people = getPeopleInput();
     fireEvent.change(people, { target: { value: 'abc' } });
 
-    expect(people).toHaveAttribute('aria-invalid', 'true');
+    // Immediate clamping behavior: non-numeric becomes 1 immediately.
+    expect(getPeopleInput()).toHaveValue(1);
+    expect(getPeopleInput()).toHaveAttribute('aria-invalid', 'false');
 
+    // Blurring should keep it valid (still 1).
     await user.click(getBillInput());
     expect(getPeopleInput()).toHaveValue(1);
+    expect(getPeopleInput()).toHaveAttribute('aria-invalid', 'false');
   });
 
   test('clearing bill input returns values to $0.00 (safe no-crash behavior)', async () => {

@@ -133,9 +133,19 @@ function App() {
   };
 
   // PUBLIC_INTERFACE
-  const onPeopleBlur = () => {
-    // Clamp to 1 if invalid/too small, but keep controlled input consistent.
-    if (peopleRaw < 1) {
+  const onPeopleBlur = (e) => {
+    /**
+     * Clamp deterministically based on the *blur-time* input value, not memoized state.
+     * This avoids any timing issues where `peopleRaw` could be stale relative to the user's last edit.
+     *
+     * Requirements:
+     * - invalid / empty / non-numeric => clamp to 1
+     * - < 1 (including 0) => clamp to 1
+     */
+    const raw = e?.target?.value;
+    const n = Number(raw);
+
+    if (!Number.isFinite(n) || n < 1) {
       setPeopleInput('1');
     }
   };

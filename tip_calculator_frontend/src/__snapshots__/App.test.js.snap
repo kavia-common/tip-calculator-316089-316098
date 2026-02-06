@@ -1,0 +1,10 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Tip Calculator App renders main sections and key controls: 1`] = `
+<h1
+  class="title"
+  id="tipcalc-title"
+>
+  Tip Calculator
+</h1>
+`;

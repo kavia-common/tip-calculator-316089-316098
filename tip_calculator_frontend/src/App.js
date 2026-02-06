@@ -3,6 +3,12 @@ import './App.css';
 
 const TIP_PRESETS = [10, 15, 18, 20];
 
+const ROUNDING_MODES = {
+  NONE: 'none',
+  TIP: 'tip',
+  TOTAL: 'total',
+};
+
 /**
  * Coerce a string from an <input type="number"> into a number for calculations.
  * - Empty string -> 0
@@ -21,6 +27,12 @@ function formatCurrency(amount) {
   return `$${safe.toFixed(2)}`;
 }
 
+/** Round to the nearest whole currency unit (e.g., dollars). */
+function roundToWholeCurrency(amount) {
+  const safe = Number.isFinite(amount) ? amount : 0;
+  return Math.round(safe);
+}
+
 // PUBLIC_INTERFACE
 function App() {
   /** Raw strings to keep the inputs controlled and robust to intermediate typing states. */
@@ -29,8 +41,12 @@ function App() {
   const [customTipInput, setCustomTipInput] = useState('');
   const lastPresetTipRef = useRef(15);
 
+  const [peopleInput, setPeopleInput] = useState('1');
+  const [roundingMode, setRoundingMode] = useState(ROUNDING_MODES.NONE);
+
   const billRaw = useMemo(() => coerceNumber(billInput), [billInput]);
   const customTipRaw = useMemo(() => coerceNumber(customTipInput), [customTipInput]);
+  const peopleRaw = useMemo(() => coerceNumber(peopleInput), [peopleInput]);
 
   const isCustomActive = customTipInput !== '';
   const activeTipPercent = isCustomActive ? customTipRaw : selectedTip;
@@ -38,16 +54,51 @@ function App() {
   const billForCalc = Math.max(0, billRaw);
   const tipPercentForCalc = Math.max(0, activeTipPercent);
 
-  const tipAmount = useMemo(() => {
+  const baseTipAmount = useMemo(() => {
     return billForCalc * (tipPercentForCalc / 100);
   }, [billForCalc, tipPercentForCalc]);
 
-  const totalAmount = useMemo(() => {
-    return billForCalc + tipAmount;
-  }, [billForCalc, tipAmount]);
+  const baseTotalAmount = useMemo(() => {
+    return billForCalc + baseTipAmount;
+  }, [billForCalc, baseTipAmount]);
 
   const billHasError = billRaw < 0;
   const tipHasError = activeTipPercent < 0;
+
+  /**
+   * Validation requirement: if people < 1, clamp to 1 and show an inline error state.
+   * - We treat non-numeric as 0 -> clamped to 1 (and also treated as error state).
+   */
+  const peopleClamped = Math.max(1, Math.floor(peopleRaw || 0));
+  const peopleHasError = peopleRaw < 1;
+
+  /**
+   * Apply rounding rules to overall (not per-person) amounts, then derive per-person
+   * from those rounded values (per requirements).
+   */
+  const { tipAmount, totalAmount } = useMemo(() => {
+    if (roundingMode === ROUNDING_MODES.TIP) {
+      const roundedTip = roundToWholeCurrency(baseTipAmount);
+      return { tipAmount: roundedTip, totalAmount: billForCalc + roundedTip };
+    }
+
+    if (roundingMode === ROUNDING_MODES.TOTAL) {
+      const roundedTotal = roundToWholeCurrency(baseTotalAmount);
+      // implied tip is roundedTotal - bill with floor at 0.00
+      const impliedTip = Math.max(0, roundedTotal - billForCalc);
+      return { tipAmount: impliedTip, totalAmount: billForCalc + impliedTip };
+    }
+
+    return { tipAmount: baseTipAmount, totalAmount: baseTotalAmount };
+  }, [roundingMode, baseTipAmount, baseTotalAmount, billForCalc]);
+
+  const perPersonTip = useMemo(() => {
+    return tipAmount / peopleClamped;
+  }, [tipAmount, peopleClamped]);
+
+  const perPersonTotal = useMemo(() => {
+    return totalAmount / peopleClamped;
+  }, [totalAmount, peopleClamped]);
 
   // PUBLIC_INTERFACE
   const onBillChange = (e) => {
@@ -76,8 +127,28 @@ function App() {
     }
   };
 
+  // PUBLIC_INTERFACE
+  const onPeopleChange = (e) => {
+    setPeopleInput(e.target.value);
+  };
+
+  // PUBLIC_INTERFACE
+  const onPeopleBlur = () => {
+    // Clamp to 1 if invalid/too small, but keep controlled input consistent.
+    if (peopleRaw < 1) {
+      setPeopleInput('1');
+    }
+  };
+
+  // PUBLIC_INTERFACE
+  const onRoundingModeChange = (e) => {
+    setRoundingMode(e.target.value);
+  };
+
   const billHelperId = 'bill-helper';
   const tipHelperId = 'tip-helper';
+  const peopleHelperId = 'people-helper';
+  const roundingHelperId = 'rounding-helper';
   const resultsLiveId = 'results-live';
 
   return (
@@ -183,6 +254,101 @@ function App() {
               </p>
             </div>
 
+            <div className="controlRow" aria-label="Split and rounding controls">
+              <div className="field narrow">
+                <label className="label" htmlFor="peopleCount">
+                  Number of people
+                </label>
+                <div className="inputRow" style={{ gridTemplateColumns: '1fr' }}>
+                  <input
+                    id="peopleCount"
+                    name="peopleCount"
+                    className={`input ${peopleHasError ? 'inputError' : ''}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    value={peopleInput}
+                    onChange={onPeopleChange}
+                    onBlur={onPeopleBlur}
+                    aria-describedby={peopleHelperId}
+                    aria-invalid={peopleHasError ? 'true' : 'false'}
+                  />
+                </div>
+                <p
+                  id={peopleHelperId}
+                  className={`helper ${peopleHasError ? 'helperError' : ''}`}
+                >
+                  {peopleHasError
+                    ? 'Minimum is 1 person. Value was clamped to 1.'
+                    : 'Split totals across people.'}
+                </p>
+              </div>
+
+              <div className="field">
+                <div className="labelRow">
+                  <span className="label" id="roundingLabel">
+                    Rounding
+                  </span>
+                  <span className="chip" aria-label="Active rounding mode">
+                    {roundingMode === ROUNDING_MODES.NONE
+                      ? 'No rounding'
+                      : roundingMode === ROUNDING_MODES.TIP
+                        ? 'Round tip'
+                        : 'Round total'}
+                  </span>
+                </div>
+
+                <div
+                  className="segmented"
+                  role="radiogroup"
+                  aria-labelledby="roundingLabel"
+                  aria-describedby={roundingHelperId}
+                >
+                  <div className="segment">
+                    <input
+                      id="round-none"
+                      type="radio"
+                      name="roundingMode"
+                      value={ROUNDING_MODES.NONE}
+                      checked={roundingMode === ROUNDING_MODES.NONE}
+                      onChange={onRoundingModeChange}
+                    />
+                    <label htmlFor="round-none">No rounding</label>
+                  </div>
+
+                  <div className="segment">
+                    <input
+                      id="round-tip"
+                      type="radio"
+                      name="roundingMode"
+                      value={ROUNDING_MODES.TIP}
+                      checked={roundingMode === ROUNDING_MODES.TIP}
+                      onChange={onRoundingModeChange}
+                    />
+                    <label htmlFor="round-tip">Round tip</label>
+                  </div>
+
+                  <div className="segment">
+                    <input
+                      id="round-total"
+                      type="radio"
+                      name="roundingMode"
+                      value={ROUNDING_MODES.TOTAL}
+                      checked={roundingMode === ROUNDING_MODES.TOTAL}
+                      onChange={onRoundingModeChange}
+                    />
+                    <label htmlFor="round-total">Round total</label>
+                  </div>
+                </div>
+
+                <p id={roundingHelperId} className="helper">
+                  No rounding keeps cents. “Round tip” rounds the tip to whole dollars; “Round total”
+                  rounds the overall total and implies the tip.
+                </p>
+              </div>
+            </div>
+
             <hr className="divider" />
 
             <section className="results" aria-labelledby="results-title">
@@ -204,6 +370,19 @@ function App() {
                   <span className="resultLabel">Total</span>
                   <span className="resultValue total">{formatCurrency(totalAmount)}</span>
                 </div>
+
+                {peopleClamped > 1 ? (
+                  <>
+                    <div className="resultRow">
+                      <span className="resultLabel">{`Tip / person (${peopleClamped})`}</span>
+                      <span className="resultValue accent">{formatCurrency(perPersonTip)}</span>
+                    </div>
+                    <div className="resultRow">
+                      <span className="resultLabel">{`Total / person (${peopleClamped})`}</span>
+                      <span className="resultValue">{formatCurrency(perPersonTotal)}</span>
+                    </div>
+                  </>
+                ) : null}
               </div>
 
               <p className="helper">

@@ -15,6 +15,15 @@
 
   --radius: 16px;
 
+  /* Interaction tokens (used for consistent hover/focus/active feedback) */
+  --focus-ring: rgba(59, 130, 246, 0.55);
+  --focus-shadow: rgba(59, 130, 246, 0.22);
+
+  --hover-border: rgba(59, 130, 246, 0.34);
+  --hover-bg: rgba(59, 130, 246, 0.06);
+
+  --press-bg: rgba(59, 130, 246, 0.10);
+
   /* Spacing + typography (for consistent rhythm) */
   --space-1: 6px;
   --space-2: 10px;
@@ -164,12 +173,20 @@
 }
 
 .input:hover {
-  border-color: rgba(59, 130, 246, 0.26);
+  /* Subtle hover tint without changing spacing/typography */
+  border-color: var(--hover-border);
 }
 
 .input:focus-visible {
+  /*
+    Requested: 2px outline + 2px offset shadow using #3b82f6.
+    We keep the border-color update for a crisp edge, but the primary
+    focus indicator is the outline + offset shadow.
+  */
   border-color: rgba(59, 130, 246, 0.65);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
   background: #ffffff;
 }
 
@@ -261,24 +278,37 @@
 }
 
 .segment label:hover {
-  border-color: rgba(59, 130, 246, 0.38);
+  border-color: var(--hover-border);
+  background: rgba(59, 130, 246, 0.05);
   box-shadow: 0 10px 22px rgba(59, 130, 246, 0.12);
   transform: translateY(-1px);
 }
 
+/* Pressed/active feedback distinct from hover (slightly stronger tint) */
 .segment:active label {
+  background: var(--press-bg);
   transform: translateY(0);
 }
 
+/* Keep keyboard focus clearly visible (do not remove outline for keyboard users) */
 .segment:focus-within label {
   border-color: rgba(59, 130, 246, 0.62);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
 }
 
 .segment input[type='radio']:checked + label {
+  /* Selected state stays distinct from hover/active */
   border-color: rgba(59, 130, 246, 0.66);
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(6, 182, 212, 0.14));
   box-shadow: 0 16px 30px rgba(59, 130, 246, 0.16);
+}
+
+/* When selected + hovered, slightly lift without changing the selected identity */
+.segment input[type='radio']:checked + label:hover {
+  border-color: rgba(59, 130, 246, 0.74);
+  box-shadow: 0 18px 34px rgba(59, 130, 246, 0.18);
 }
 
 .presetGroup {
@@ -304,25 +334,38 @@
 }
 
 .presetBtn:hover {
-  border-color: rgba(59, 130, 246, 0.42);
+  /* Clearer hover: subtle tint + a touch of lift */
+  border-color: var(--hover-border);
+  background: rgba(59, 130, 246, 0.05);
   box-shadow: 0 10px 22px rgba(59, 130, 246, 0.12);
   transform: translateY(-1px);
 }
 
 .presetBtn:active {
+  /* Pressed: slightly stronger tint, no extra spacing changes */
+  background: var(--press-bg);
   transform: translateY(0);
 }
 
 .presetBtn:focus-visible {
   border-color: rgba(59, 130, 246, 0.62);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
 }
 
 .presetBtnActive {
+  /* Selected state remains visually distinct from hover */
   border-color: rgba(59, 130, 246, 0.72);
   color: rgba(29, 78, 216, 0.98);
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(6, 182, 212, 0.16));
   box-shadow: 0 18px 32px rgba(59, 130, 246, 0.18);
+}
+
+/* Selected + hovered: mild enhancement without overriding the selected styling */
+.presetBtnActive:hover {
+  border-color: rgba(59, 130, 246, 0.80);
+  box-shadow: 0 20px 38px rgba(59, 130, 246, 0.20);
 }
 
 .customWrap .inputRow {
@@ -474,5 +517,14 @@
   .controlRow > .field,
   .controlRow > .field.narrow {
     min-width: 200px;
+  }
+}
+
+/* Local reduced-motion safeguard (global rule exists in index.css; this keeps App.css self-contained) */
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .presetBtn,
+  .segment label {
+    transition: none !important;
   }
 }

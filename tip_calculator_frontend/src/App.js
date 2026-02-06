@@ -129,7 +129,26 @@ function App() {
 
   // PUBLIC_INTERFACE
   const onPeopleChange = (e) => {
-    setPeopleInput(e.target.value);
+    /**
+     * Deterministic clamping:
+     * Normalize on every change so the controlled value is always a valid integer >= 1.
+     *
+     * Rationale: Some tests and CI environments can observe intermediate states before blur
+     * fires or before state settles. By enforcing the invariant in onChange, we guarantee
+     * consistent behavior.
+     */
+    const raw = e?.target?.value;
+
+    // Empty input, non-numeric, or <= 0 => immediately coerce to "1"
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      setPeopleInput('1');
+      return;
+    }
+
+    // Coerce to integer >= 1
+    const clampedInt = Math.max(1, Math.floor(n));
+    setPeopleInput(String(clampedInt));
   };
 
   // PUBLIC_INTERFACE
